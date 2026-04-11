@@ -17,13 +17,11 @@ public class ChatService {
     private final ChatRoomRepository chatRoomRepository;
     private final UserRepository userRepository;
     private final RoomInvitationRepository invitationRepository;
-    private final EmailService emailService;
 
-    public ChatService(ChatRoomRepository chatRoomRepository, UserRepository userRepository, RoomInvitationRepository invitationRepository, EmailService emailService) {
+    public ChatService(ChatRoomRepository chatRoomRepository, UserRepository userRepository, RoomInvitationRepository invitationRepository) {
         this.chatRoomRepository = chatRoomRepository;
         this.userRepository = userRepository;
         this.invitationRepository = invitationRepository;
-        this.emailService = emailService;
     }
 
     public List<ChatRoom> listRoomsForUser(String username) {
@@ -66,12 +64,6 @@ public class ChatService {
             invitation.setInvitedUsername(invitee);
             invitation.setInvitedBy(creatorUsername);
             invitationRepository.save(invitation);
-
-            userRepository.findByUsername(invitee).ifPresent(user -> {
-                if (user.getEmail() != null && !user.getEmail().isBlank()) {
-                    emailService.sendInvitationEmail(user.getEmail(), savedRoom.getName(), creatorUsername);
-                }
-            });
         }
 
         return savedRoom;
