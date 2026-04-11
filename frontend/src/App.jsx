@@ -39,6 +39,9 @@ function App() {
   const [userSuggestions, setUserSuggestions] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [showInvitations, setShowInvitations] = useState(false);
+  const [showIpAddresses, setShowIpAddresses] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const wsRef = useRef(null);
   const selectedRoomIdRef = useRef(null);
@@ -185,7 +188,13 @@ function App() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiRequest(`/api/rooms/${selectedRoom.id}/messages`);
+        let url = `/api/rooms/${selectedRoom.id}/messages`;
+        const params = new URLSearchParams();
+        if (dateFrom) params.append('from', new Date(dateFrom).toISOString());
+        if (dateTo) params.append('to', new Date(dateTo).toISOString());
+        if (params.toString()) url += `?${params.toString()}`;
+
+        const data = await apiRequest(url);
         if (!cancelled) {
           setMessages(data || []);
         }
@@ -198,7 +207,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedRoom?.id, apiRequest]);
+  }, [selectedRoom?.id, dateFrom, dateTo, apiRequest]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -615,8 +624,51 @@ function App() {
               <p className="hint">Слева можно открыть диалог с человеком или создать группу.</p>
             )}
           </div>
+          {selectedRoom.id && (
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '0.85rem' }}>
+                <label style={{ marginRight: '4px' }}>С:</label>
+                <input
+                  type="datetime-local"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  style={{ fontSize: '0.85rem', padding: '2px 4px' }}
+                />
+              </div>
+              <div style={{ fontSize: '0.85rem' }}>
+                <label style={{ marginRight: '4px' }}>По:</label>
+                <input
+                  type="datetime-local"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  style={{ fontSize: '0.85rem', padding: '2px 4px' }}
+                />
+              </div>
+              {(dateFrom || dateTo) && (
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  style={{ fontSize: '0.75rem', padding: '2px 8px' }}
+                  onClick={() => {
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
+                >
+                  Сбросить
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{ fontSize: '0.85rem' }}
+                onClick={() => setShowIpAddresses(!showIpAddresses)}
+              >
+                {showIpAddresses ? 'Скрыть IP' : 'Показать IP'}
+              </button>
+            </div>
+          )}
           {selectedRoom.id && selectedRoom.type === 'GROUP' && selectedRoom.participants?.length > 0 && (
-            <div style={{ fontSize: '0.85rem' }}>
+            <div style={{ fontSize: '0.85rem', marginTop: '8px' }}>
               <details>
                 <summary style={{ cursor: 'pointer', userSelect: 'none' }}>Участники</summary>
                 <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto' }}>
@@ -689,7 +741,14 @@ function App() {
                     <div className="bubble">
                       {!mine ? <div className="who">{message.sender}</div> : null}
                       <p>{message.content}</p>
-                      <div className="time">{formatTime(message.sentAt)}</div>
+                      <div className="time">
+                        {formatTime(message.sentAt)}
+                        {showIpAddresses && message.senderIp && (
+                          <span style={{ marginLeft: '8px', fontSize: '0.75rem', opacity: 0.7 }}>
+                            · IP: {message.senderIp}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
