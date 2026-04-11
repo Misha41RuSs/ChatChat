@@ -18,6 +18,7 @@ public class MessageDto {
     private String fileUrl;
     private String senderIp;
     private Instant sentAt;
+    private Boolean isSystem;
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -32,6 +33,7 @@ public class MessageDto {
         dto.setFileUrl(message.getFileUrl());
         dto.setSenderIp(message.getSenderIp());
         dto.setSentAt(message.getSentAt());
+        dto.setIsSystem(message.getIsSystem());
         return dto;
     }
 

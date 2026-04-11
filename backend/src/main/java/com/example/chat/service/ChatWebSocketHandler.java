@@ -92,4 +92,28 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             }
         }
     }
+
+    public void broadcastSystemMessage(Long roomId, String content) {
+        try {
+            Message systemMessage = messageService.createSystemMessage(roomId, content);
+            MessageDto dto = MessageDto.fromEntity(systemMessage);
+            String json = dto.toJson();
+
+            chatService.getRoomParticipants(roomId).forEach(participant -> {
+                Set<WebSocketSession> sockets = sessionsByUser.get(participant);
+                if (sockets == null) {
+                    return;
+                }
+                for (WebSocketSession target : sockets) {
+                    if (target != null && target.isOpen()) {
+                        try {
+                            target.sendMessage(new TextMessage(json));
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+            });
+        } catch (Exception ignored) {
+        }
+    }
 }

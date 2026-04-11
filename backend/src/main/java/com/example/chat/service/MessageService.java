@@ -41,4 +41,16 @@ public class MessageService {
         }
         return messageRepository.findByChatRoomOrderBySentAtAsc(room);
     }
+
+    public Message createSystemMessage(Long roomId, String content) {
+        ChatRoom room = chatService.findById(roomId);
+        Message message = new Message();
+        message.setChatRoom(room);
+        message.setSender("SYSTEM");
+        message.setContent(content);
+        message.setSenderIp("system");
+        message.setSentAt(Instant.now());
+        message.setIsSystem(true);
+        return messageRepository.save(message);
+    }
 }

@@ -37,6 +37,8 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [userQuery, setUserQuery] = useState('');
   const [userSuggestions, setUserSuggestions] = useState([]);
+  const [invitations, setInvitations] = useState([]);
+  const [showInvitations, setShowInvitations] = useState(false);
 
   const wsRef = useRef(null);
   const selectedRoomIdRef = useRef(null);
@@ -104,6 +106,15 @@ function App() {
     });
   }, [apiRequest]);
 
+  const fetchInvitations = useCallback(async () => {
+    try {
+      const data = await apiRequest('/api/invitations');
+      setInvitations(data || []);
+    } catch {
+      setInvitations([]);
+    }
+  }, [apiRequest]);
+
   const connectWebSocket = useCallback(() => {
     if (!token) {
       return;
@@ -147,6 +158,7 @@ function App() {
     (async () => {
       try {
         await fetchRooms();
+        await fetchInvitations();
         if (!cancelled) {
           connectWebSocket();
         }
@@ -163,7 +175,7 @@ function App() {
         w.close();
       }
     };
-  }, [token, fetchRooms, connectWebSocket]);
+  }, [token, fetchRooms, fetchInvitations, connectWebSocket]);
 
   useEffect(() => {
     if (!selectedRoom?.id) {
@@ -316,8 +328,46 @@ function App() {
     setError('');
     setUserSuggestions([]);
     setUserQuery('');
+    setInvitations([]);
     if (wsRef.current) {
       wsRef.current.close();
+    }
+  };
+
+  const acceptInvitation = async invitationId => {
+    setError('');
+    try {
+      await apiRequest(`/api/invitations/${invitationId}/accept`, { method: 'POST' });
+      await fetchInvitations();
+      await fetchRooms();
+    } catch (err) {
+      setError(err.message || 'Не удалось принять приглашение.');
+    }
+  };
+
+  const declineInvitation = async invitationId => {
+    setError('');
+    try {
+      await apiRequest(`/api/invitations/${invitationId}/decline`, { method: 'POST' });
+      await fetchInvitations();
+    } catch (err) {
+      setError(err.message || 'Не удалось отклонить приглашение.');
+    }
+  };
+
+  const kickParticipant = async targetUsername => {
+    if (!selectedRoom?.id) {
+      return;
+    }
+    setError('');
+    try {
+      await apiRequest(`/api/rooms/${selectedRoom.id}/kick`, {
+        method: 'POST',
+        body: JSON.stringify({ username: targetUsername })
+      });
+      await fetchRooms();
+    } catch (err) {
+      setError(err.message || 'Не удалось удалить участника.');
     }
   };
 
@@ -418,6 +468,61 @@ function App() {
           </button>
         </div>
 
+        {invitations.length > 0 && (
+          <div className="panel-block" style={{ background: '#fff3cd', border: '1px solid #ffc107' }}>
+            <h3 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Приглашения ({invitations.length})</span>
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{ fontSize: '0.8rem', padding: '2px 8px' }}
+                onClick={() => setShowInvitations(!showInvitations)}
+              >
+                {showInvitations ? 'Скрыть' : 'Показать'}
+              </button>
+            </h3>
+            {showInvitations && (
+              <div style={{ marginTop: '8px' }}>
+                {invitations.map(inv => (
+                  <div
+                    key={inv.id}
+                    style={{
+                      padding: '8px',
+                      marginBottom: '8px',
+                      background: 'white',
+                      borderRadius: '4px',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    <div style={{ marginBottom: '4px' }}>
+                      <strong>{inv.roomName}</strong>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
+                      от {inv.invitedBy}
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        className="btn-small primary"
+                        onClick={() => acceptInvitation(inv.id)}
+                      >
+                        Принять
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-small"
+                        onClick={() => declineInvitation(inv.id)}
+                      >
+                        Отклонить
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="panel-block">
           <h3>Личный чат</h3>
           <input
@@ -510,6 +615,45 @@ function App() {
               <p className="hint">Слева можно открыть диалог с человеком или создать группу.</p>
             )}
           </div>
+          {selectedRoom.id && selectedRoom.type === 'GROUP' && selectedRoom.participants?.length > 0 && (
+            <div style={{ fontSize: '0.85rem' }}>
+              <details>
+                <summary style={{ cursor: 'pointer', userSelect: 'none' }}>Участники</summary>
+                <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                  {selectedRoom.participants.map(p => {
+                    const isCreator = rooms.find(r => r.id === selectedRoom.id)?.creatorUsername === username;
+                    return (
+                      <div
+                        key={p}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '4px 0'
+                        }}
+                      >
+                        <span>{p}</span>
+                        {p !== username && isCreator && (
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            style={{ fontSize: '0.75rem', padding: '2px 6px', color: '#dc3545' }}
+                            onClick={() => {
+                              if (window.confirm(`Удалить ${p} из группы?`)) {
+                                kickParticipant(p);
+                              }
+                            }}
+                          >
+                            Удалить
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            </div>
+          )}
         </header>
 
         {!selectedRoom.id ? (
@@ -521,6 +665,25 @@ function App() {
             <div className="message-list">
               {messages.map(message => {
                 const mine = message.sender === username;
+                const isSystem = message.isSystem === true;
+
+                if (isSystem) {
+                  return (
+                    <div key={message.id ?? `${message.sender}-${message.sentAt}`} style={{ textAlign: 'center', margin: '12px 0' }}>
+                      <div style={{
+                        display: 'inline-block',
+                        padding: '6px 12px',
+                        background: '#e9ecef',
+                        borderRadius: '12px',
+                        fontSize: '0.85rem',
+                        color: '#495057'
+                      }}>
+                        {message.content}
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={message.id ?? `${message.sender}-${message.sentAt}`} className={`bubble-row ${mine ? 'mine' : ''}`}>
                     <div className="bubble">

@@ -22,4 +22,5 @@ public class Message {
     private String fileUrl;
     private String senderIp;
     private Instant sentAt;
+    private Boolean isSystem = false;
 }

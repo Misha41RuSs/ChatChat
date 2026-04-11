@@ -2,10 +2,12 @@ package com.example.chat.controller;
 
 import com.example.chat.dto.ChatRoomDto;
 import com.example.chat.dto.DirectMessageRequest;
+import com.example.chat.dto.InvitationDto;
 import com.example.chat.dto.MessageDto;
 import com.example.chat.entity.ChatRoom;
 import com.example.chat.entity.User;
 import com.example.chat.service.ChatService;
+import com.example.chat.service.ChatWebSocketHandler;
 import com.example.chat.service.MessageService;
 import com.example.chat.service.UserService;
 import com.example.chat.util.AuthTokens;
@@ -30,11 +32,13 @@ public class ChatController {
     private final ChatService chatService;
     private final MessageService messageService;
     private final UserService userService;
+    private final ChatWebSocketHandler webSocketHandler;
 
-    public ChatController(ChatService chatService, MessageService messageService, UserService userService) {
+    public ChatController(ChatService chatService, MessageService messageService, UserService userService, ChatWebSocketHandler webSocketHandler) {
         this.chatService = chatService;
         this.messageService = messageService;
         this.userService = userService;
+        this.webSocketHandler = webSocketHandler;
     }
 
     @GetMapping("/me")
@@ -112,6 +116,48 @@ public class ChatController {
         return messageService.getMessages(roomId, user.getUsername(), start, end).stream()
                 .map(MessageDto::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    @PostMapping("/rooms/{roomId}/kick")
+    public ResponseEntity<?> kickParticipant(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+            @PathVariable("roomId") Long roomId,
+            @RequestBody java.util.Map<String, String> body) {
+        User admin = requireUser(authorization);
+        String targetUsername = body.get("username");
+        if (targetUsername == null || targetUsername.isBlank()) {
+            throw new IllegalArgumentException("Укажите имя пользователя для удаления");
+        }
+        chatService.kickParticipant(roomId, admin.getUsername(), targetUsername.trim());
+        webSocketHandler.broadcastSystemMessage(roomId, targetUsername.trim() + " был удалён из группы");
+        return ResponseEntity.ok(java.util.Map.of("message", "Участник удалён"));
+    }
+
+    @GetMapping("/invitations")
+    public List<InvitationDto> getInvitations(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        User user = requireUser(authorization);
+        return chatService.getPendingInvitations(user.getUsername()).stream()
+                .map(InvitationDto::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @PostMapping("/invitations/{invitationId}/accept")
+    public ResponseEntity<?> acceptInvitation(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+            @PathVariable("invitationId") Long invitationId) {
+        User user = requireUser(authorization);
+        ChatRoom room = chatService.acceptInvitation(invitationId, user.getUsername());
+        webSocketHandler.broadcastSystemMessage(room.getId(), user.getUsername() + " присоединился к группе");
+        return ResponseEntity.ok(java.util.Map.of("message", "Приглашение принято"));
+    }
+
+    @PostMapping("/invitations/{invitationId}/decline")
+    public ResponseEntity<?> declineInvitation(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+            @PathVariable("invitationId") Long invitationId) {
+        User user = requireUser(authorization);
+        chatService.declineInvitation(invitationId, user.getUsername());
+        return ResponseEntity.ok(java.util.Map.of("message", "Приглашение отклонено"));
     }
 
     private User requireUser(String authorization) {

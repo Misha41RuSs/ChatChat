@@ -11,6 +11,7 @@ public class ChatRoomDto {
     private String name;
     private String type;
     private List<String> participants;
+    private String creatorUsername;
 
     public static ChatRoomDto fromEntity(ChatRoom room) {
         ChatRoomDto dto = new ChatRoomDto();
@@ -18,6 +19,7 @@ public class ChatRoomDto {
         dto.setName(room.getName());
         dto.setType(room.getType().name());
         dto.setParticipants(room.getParticipants());
+        dto.setCreatorUsername(room.getCreatorUsername());
         return dto;
     }
 }

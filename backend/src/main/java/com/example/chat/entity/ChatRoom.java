@@ -19,6 +19,8 @@ public class ChatRoom {
     @Enumerated(EnumType.STRING)
     private RoomType type = RoomType.GROUP;
 
+    private String creatorUsername;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "chat_room_participants", joinColumns = @JoinColumn(name = "room_id"))
     @Column(name = "username")
