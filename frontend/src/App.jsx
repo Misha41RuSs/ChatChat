@@ -323,18 +323,18 @@ function App() {
       try {
         const formData = new FormData();
         formData.append('file', selectedFile);
-        
+
         const base = apiBase();
         const response = await fetch(`${base}/api/files/upload`, {
           method: 'POST',
           headers: authHeaders,
           body: formData,
         });
-        
+
         if (!response.ok) {
           throw new Error('Ошибка при загрузке файла');
         }
-        
+
         const data = await response.json();
         uploadedFileUrl = data.fileUrl;
       } catch (err) {
@@ -793,10 +793,10 @@ function App() {
 
             <div className="composer">
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px', padding: '0 8px' }}>
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   style={{ fontSize: '0.85rem' }}
-                  onChange={e => setSelectedFile(e.target.files[0] || null)} 
+                  onChange={e => setSelectedFile(e.target.files[0] || null)}
                 />
                 {selectedFile && (
                   <button type="button" className="btn-ghost" style={{ fontSize: '0.8rem', padding: '2px 6px' }} onClick={() => {
