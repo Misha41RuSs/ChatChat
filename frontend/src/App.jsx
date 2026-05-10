@@ -34,6 +34,7 @@ function App() {
   const [newRoomParticipants, setNewRoomParticipants] = useState('');
   const [dmUsername, setDmUsername] = useState('');
   const [newMessage, setNewMessage] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
   const [connected, setConnected] = useState(false);
   const [userQuery, setUserQuery] = useState('');
   const [userSuggestions, setUserSuggestions] = useState([]);
@@ -307,23 +308,50 @@ function App() {
     }
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       setError('Нет соединения с чатом. Подождите или обновите страницу.');
       return;
     }
-    if (!newMessage.trim() || !selectedRoom.id) {
+    if ((!newMessage.trim() && !selectedFile) || !selectedRoom.id) {
       return;
     }
     setError('');
+
+    let uploadedFileUrl = null;
+    if (selectedFile) {
+      try {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        
+        const base = apiBase();
+        const response = await fetch(`${base}/api/files/upload`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error('Ошибка при загрузке файла');
+        }
+        
+        const data = await response.json();
+        uploadedFileUrl = data.fileUrl;
+      } catch (err) {
+        setError(err.message || 'Не удалось загрузить файл.');
+        return;
+      }
+    }
+
     wsRef.current.send(
       JSON.stringify({
         roomId: selectedRoom.id,
         content: newMessage.trim(),
-        fileUrl: null
+        fileUrl: uploadedFileUrl
       })
     );
     setNewMessage('');
+    setSelectedFile(null);
   };
 
   const logout = () => {
@@ -741,6 +769,13 @@ function App() {
                     <div className="bubble">
                       {!mine ? <div className="who">{message.sender}</div> : null}
                       <p>{message.content}</p>
+                      {message.fileUrl && (
+                        <div className="message-file" style={{ marginTop: '4px' }}>
+                          <a href={message.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 'bold', textDecoration: 'underline' }}>
+                            📎 Вложение
+                          </a>
+                        </div>
+                      )}
                       <div className="time">
                         {formatTime(message.sentAt)}
                         {showIpAddresses && message.senderIp && (
@@ -757,6 +792,21 @@ function App() {
             </div>
 
             <div className="composer">
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px', padding: '0 8px' }}>
+                <input 
+                  type="file" 
+                  style={{ fontSize: '0.85rem' }}
+                  onChange={e => setSelectedFile(e.target.files[0] || null)} 
+                />
+                {selectedFile && (
+                  <button type="button" className="btn-ghost" style={{ fontSize: '0.8rem', padding: '2px 6px' }} onClick={() => {
+                    setSelectedFile(null);
+                    document.querySelector('.composer input[type="file"]').value = '';
+                  }}>
+                    Очистить
+                  </button>
+                )}
+              </div>
               <textarea
                 placeholder="Сообщение… Enter — отправить, Shift+Enter — новая строка"
                 value={newMessage}
