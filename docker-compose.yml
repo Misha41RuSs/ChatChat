@@ -48,7 +48,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "80:80"
+      - "5734:80"
     networks:
       - chat_network
 
